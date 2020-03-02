@@ -26,12 +26,12 @@
 
 U8GLIB_SSD1306_128X64 u8g(OLED_CLK, OLED_MOSI, OLED_CS, OLED_DC, OLED_RESET);
 
-const char *main_itens[] = { "BPM View", "Messages", "Button 1", "Button 2", "Midi", NULL };
+const char *main_itens[] = { "BPM View", "Messages", "Config", "Save", NULL };
 const char *button_itens[] = { "Normaly Closed", "Normaly Opened", "Latched", "Return", NULL };
-const char *midi_itens[] = { "Channel", "TAP Key", "Return", NULL };
+const char *config_itens[] = { "MIDI Channel", "MIDI CC TAP Key", "Button 1", "Button 2", "Return", NULL };
 
 MicroPanelMenu *mainMenu;
-MicroPanelMenu *midiMainMenu;
+MicroPanelMenu *configMenu;
 MicroPanelCheck *buttonMenu1;
 MicroPanelCheck *buttonMenu2;
 MicroPanelTerminal *terminal;
@@ -66,6 +66,36 @@ uint8_t tap=0;
 uint8_t channel = 1;
 uint8_t tapcc = 64;
 uint8_t buttonType[2] = { BT_NORMALY_CLOSED, BT_NORMALY_OPEN };
+
+void readConfig()
+{
+	channel = EEPROM.read(1);
+	tapcc	= EEPROM.read(2);
+	buttonType[0] = EEPROM.read(3);
+	buttonType[1] = EEPROM.read(4);
+}
+
+void writeConfig()
+{
+	EEPROM.update(1, channel);
+	if (channel > 15)
+		channel = 1;
+		
+	EEPROM.update(2, tapcc);
+	if (tapcc > 127)
+		tapcc = 64;
+		
+	EEPROM.update(3, buttonType[0]);
+	if (buttonType[0] > BT_LATCHED)
+		buttonType[0] = BT_NORMALY_CLOSED;
+		
+	EEPROM.update(4, buttonType[1]);
+	if (buttonType[1] > BT_LATCHED)
+		buttonType[1] = BT_NORMALY_OPEN;
+
+	Serial1.println("Saved");
+}
+
 
 void clock_processTAP(uint32_t now, bool midi=false)
 {
@@ -279,7 +309,7 @@ void setup()
 	terminal = new MicroPanelTerminal();
 	buttonMenu1 = new MicroPanelCheck(button_itens, &buttonType[0]);
 	buttonMenu2 = new MicroPanelCheck(button_itens, &buttonType[1]);
-	midiMainMenu = new MicroPanelMenu(midi_itens);
+	configMenu = new MicroPanelMenu(config_itens);
 	bign = new MicroPanelBigNumber("bpm", 0);
 	midiChannelPanel = new MicroPanelBigNumber("channel", 0);
 	midiTapCCPanel = new MicroPanelBigNumber("TAP CC", 0);
@@ -287,6 +317,8 @@ void setup()
 	panel = bign;
 	
 	initCounter();
+
+	readConfig();
 
 	midi_set_channel(channel);
 	midi_clock_init(micros());
@@ -358,24 +390,20 @@ void menuClick()
 			break;
 
 		case 2:
-			panel = buttonMenu1;
+			panel = configMenu;
 			break;
 
 		case 3:
-			panel = buttonMenu2;
-			break;
-
-		case 4:
-			panel = midiMainMenu;
+			writeConfig();
 			break;
 		}  
 	} else if (panel == buttonMenu1 || panel == buttonMenu2) {
 		uint8_t x = ((MicroPanelCheck *) panel)->getCurrItem();
-		if (x == 3) {
-			panel = mainMenu;
-		} else
+		if (x == 3)
+			panel = configMenu;
+		else
 			*(((MicroPanelCheck *) panel)->checkedItem) = x;
-	} else if (panel == midiMainMenu) {
+	} else if (panel == configMenu) {
 		uint8_t x = ((MicroPanelMenu *) panel)->getCurrItem();
 		switch(x) {
 		case 0:
@@ -385,9 +413,17 @@ void menuClick()
 			panel = midiTapCCPanel;
 			break;
 		case 2:
-			panel = mainMenu;
+			panel = buttonMenu1;
+			break;
+		case 3:
+			panel = buttonMenu2;
+			break;		
+		case 4:
+			panel = mainMenu;	
 			break;
 		}
+	} else if (panel == midiChannelPanel || panel == midiTapCCPanel) {
+		panel = configMenu;
 	} else  {
 		panel = mainMenu;
 	}
