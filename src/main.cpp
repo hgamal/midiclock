@@ -1,48 +1,43 @@
+#include <avr/io.h>
+#include <util/delay.h>
+#include <avr/interrupt.h>
 #include <U8glib.h>
-#include <EEPROM.h>
 
 #include "debounce.h"
 #include "micro_panel.h"
 #include "squeue.h"
 #include "midi.h"
+#include "uart.h"
+#include "timer0.h"
+#include "arduino_io.h"
 
-#define TAPSWT  5
-#define TAPLED  6
-#define RXLED   17
-#define CLICK   7
+#define	HIGH	1
+#define LOW		0
 
-#define TAP1	A3
-#define TAP2	A10
+#define TAPSWT  MKPORT(PINC, PC6)
+#define TAPLED  MKPORT(PORTD, PD7)
+#define RXLED   MKPORT(PORTB, PB0)
+#define CLICK   MKPORT(PINE, PE6)
+
+#define TAP1	MKPORT(PORTF, PF4)
+#define TAP2	MKPORT(PORTD, PD6)
 
 // Declaration for SSD1306 display connected using software SPI (default case):
-#define OLED_MOSI  16
-#define OLED_CLK   15
-#define OLED_DC    A1
-#define OLED_CS    A2
-#define OLED_RESET A0
+#define OLED_MOSI  MKPORT(PORTD, PD2)
+#define OLED_CLK   MKPORT(PORTB, PB1)
+#define OLED_DC    MKPORT(PORTF, PF7)
+#define OLED_CS    MKPORT(PORTF, PF5)
+#define OLED_RESET MKPORT(PORTD, PD2)
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
-U8GLIB_SSD1306_128X64 u8g(OLED_CLK, OLED_MOSI, OLED_CS, OLED_DC, OLED_RESET);
+U8GLIB_SSD1306_128X64 u8g(u8g_Pin(PORTF, PF5), u8g_Pin(PORTF,PF7), u8g_Pin(PORTD,PD2));
 
-const char *main_itens[] = { "BPM View", "Messages", "Config", "Save", NULL };
-const char *button_itens[] = { "Normaly Closed", "Normaly Opened", "Latched", "Return", NULL };
-const char *config_itens[] = { "MIDI Channel", "MIDI CC TAP Key", "Button 1", "Button 2", "Return", NULL };
+void menuClick();
 
-MicroPanelMenu *mainMenu;
-MicroPanelMenu *configMenu;
-MicroPanelCheck *buttonMenu1;
-MicroPanelCheck *buttonMenu2;
-MicroPanelTerminal *terminal;
-MicroPanelBigNumber *bign;
-MicroPanelBigNumber *midiChannelPanel;
-MicroPanelBigNumber *midiTapCCPanel;
-
-MicroPanel *panel = mainMenu;
-
-#define encoder0PinA 9
-#define encoder0PinB 8
+#define encoder0PinA PB5	// 9
+#define encoder0PinB PB4	// 8
 
 int16_t oldPosition = 0;
 int16_t newPosition = 0;
@@ -50,7 +45,7 @@ uint16_t blinkTime = 0;
 uint32_t countInt = 0;
 uint8_t inTap = 0;
 
-uint8_t buttonPort[2] = { TAP1, TAP2 };
+uint8_t buttonPort[2]; // = { TAP1, TAP2 };
 uint8_t buttonState[2] = { 0, 0 };
 uint8_t currButton = 0;
 
@@ -67,6 +62,22 @@ uint8_t channel = 1;
 uint8_t tapcc = 64;
 uint8_t buttonType[2] = { BT_NORMALY_CLOSED, BT_NORMALY_OPEN };
 
+const char *main_itens[] = { "BPM View", "Messages", "Config", "Save", NULL };
+const char *button_itens[] = { "Normaly Closed", "Normaly Opened", "Latched", "Return", NULL };
+const char *config_itens[] = { "MIDI Channel", "MIDI CC TAP Key", "Button 1", "Button 2", "Return", NULL };
+
+MicroPanelMenu mainMenu(main_itens);
+MicroPanelTerminal terminal;
+MicroPanelCheck buttonMenu1(button_itens, &buttonType[0]);
+MicroPanelCheck buttonMenu2(button_itens, &buttonType[1]);
+MicroPanelMenu configMenu(config_itens);
+MicroPanelBigNumber bign("bpm", 0);
+MicroPanelBigNumber midiChannelPanel("channel", 0);
+MicroPanelBigNumber midiTapCCPanel("TAP CC", 0);
+
+MicroPanel *panel = &mainMenu;
+
+#ifdef ECONFIG
 void readConfig()
 {
 	channel = EEPROM.read(1);
@@ -92,10 +103,8 @@ void writeConfig()
 	EEPROM.update(4, buttonType[1]);
 	if (buttonType[1] > BT_LATCHED)
 		buttonType[1] = BT_NORMALY_OPEN;
-
-	Serial1.println("Saved");
 }
-
+#endif
 
 void clock_process_MIDIClock(uint32_t now)
 {
@@ -134,18 +143,14 @@ void clock_processTAP(uint32_t now, bool midi=false)
 		old_time = now;
 		MicroPanel::reload();
 	}
-
-	return 0;
 }
 
 void sendMIDI(uint8_t message)
 {
-	if (Serial1.availableForWrite())
-		Serial1.write(message);
-	else {
-		Serial.println("ENQUEUE");
+	if (uart_putchar_ready())
+		uart_putchar(message);
+	else
 		enqueue(message);
-	}
 }
 
 void event_proc(uint8_t message, uint32_t absolute_position, uint16_t bpm)
@@ -162,18 +167,18 @@ void event_midi_proc(uint8_t message, uint8_t control, uint8_t value)
 	if (((message & 0xf0) == 0xB0) && (control == tapcc) && (value == 127)) {
 		uint32_t now = micros();
 		clock_processTAP(now, true);
-    	terminal->printf("\nTAP %d\n", midi_clock_getBPM());
+    	terminal.printf("\nTAP %d\n", midi_clock_getBPM());
 		
 	}
 }
 
 void serialEvent1() 
 {
-	while (Serial1.available()) {
+	while (uart_getchar_ready()) {
 	    // get the new byte:
-    	char message = (char) Serial1.read();
+    	char message = (char) uart_getchar();
     	
-		terminal->printf("%02x ", message & 0xff);
+		terminal.printf("%02x ", message & 0xff);
 		
 		midi_evaluate_state(message, event_midi_proc);
 		
@@ -226,14 +231,11 @@ void clock_event()
 	}
 
 	midi_clock_process(now, event_proc);
-	
 }
 
 
 ISR(TIMER1_COMPA_vect)          // timer compare interrupt service routine
 {
-	clock_event();
-
 	countInt++;
 	
 	static uint8_t dbc=-1;
@@ -244,19 +246,18 @@ ISR(TIMER1_COMPA_vect)          // timer compare interrupt service routine
 		return;
 
 	uint8_t n = digitalRead(CLICK);
-	//Serial.println(n);
 	if (debounce(!n, &click) == KEY_DOWN)
 		menuClick();
 
 	MicroPanel::reload();
 
-	n = digitalRead(encoder0PinA);
+	n = encoder0PinA;
 	if ((encoder0PinALast == HIGH) && (n == LOW)) {
-		if (digitalRead(encoder0PinB) == HIGH)
+		if (encoder0PinB == HIGH)
 			newPosition--;
 		else
 			newPosition++;
-		//Serial.println(newPosition);
+
 		digitalWrite(RXLED, digitalRead(RXLED) ^ 1);
 	}
 	encoder0PinALast = n;
@@ -298,10 +299,73 @@ void initCounter(void)
 	sei(); 
 }
 
-void setup()
+/** this code rules what occurs when the dial button is clicked **/
+void menuClick()
 {
-	Serial.begin(9600);
-	Serial1.begin(31250);
+	if (panel == &mainMenu) {
+		uint8_t x = mainMenu.getCurrItem();
+		switch(x) {
+		case 0:
+			panel = &bign;
+			break;
+
+		case 1:
+			panel = &terminal;
+			break;
+
+		case 2:
+			panel = &configMenu;
+			break;
+
+		case 3:
+#ifdef ECONFIG
+			writeConfig();
+#endif
+			break;
+		}  
+	} else if (panel == &buttonMenu1 || panel == &buttonMenu2) {
+		uint8_t x = ((MicroPanelCheck *) panel)->getCurrItem();
+		if (x == 3)
+			panel = &configMenu;
+		else
+			*(((MicroPanelCheck *) panel)->checkedItem) = x;
+	} else if (panel == &configMenu) {
+		uint8_t x = ((MicroPanelMenu *) panel)->getCurrItem();
+		switch(x) {
+		case 0:
+			panel = &midiChannelPanel;
+			break;
+		case 1:
+			panel = &midiTapCCPanel;
+			break;
+		case 2:
+			panel = &buttonMenu1;
+			break;
+		case 3:
+			panel = &buttonMenu2;
+			break;		
+		case 4:
+			panel = &mainMenu;	
+			break;
+		}
+	} else if (panel == &midiChannelPanel || panel == &midiTapCCPanel) {
+		panel = &configMenu;
+	} else  {
+		panel = &mainMenu;
+	}
+	
+	MicroPanel::reload();
+}
+
+extern "C" void __cxa_pure_virtual()
+{
+	while (1);
+}
+
+int main()
+{
+	uart_init(31250);
+	initTimer0();
 
 	pinMode(1, OUTPUT);
 	pinMode(RXLED, OUTPUT);
@@ -322,129 +386,68 @@ void setup()
 	// u8g.setContrast(255);
 	u8g.setColorIndex(1);
 	u8g.setFont(u8g_font_6x13B);
-	
-	mainMenu = new MicroPanelMenu(main_itens);
-	terminal = new MicroPanelTerminal();
-	buttonMenu1 = new MicroPanelCheck(button_itens, &buttonType[0]);
-	buttonMenu2 = new MicroPanelCheck(button_itens, &buttonType[1]);
-	configMenu = new MicroPanelMenu(config_itens);
-	bign = new MicroPanelBigNumber("bpm", 0);
-	midiChannelPanel = new MicroPanelBigNumber("channel", 0);
-	midiTapCCPanel = new MicroPanelBigNumber("TAP CC", 0);
-	
-	panel = bign;
+		
+	panel = &bign;
 	
 	initCounter();
 
+#ifdef ECONFIG
 	readConfig();
+#endif
 
 	midi_set_channel(channel);
 	midi_clock_init(micros());
 	
 	MicroPanel::reload();
-	terminal->puts("Meesages\n");
-}
+	terminal.puts("Messages\n");
 
-void loop() 
-{
-	/** purge serial characters **/
-	if (!empty()) {
-		noInterrupts();
-		if (Serial1.availableForWrite()) {
-			Serial.println("DEQUEUE");
-			Serial1.write(dequeue());
+	while (1) {
+		clock_event();
+
+		/** purge serial characters **/
+		if (!empty()) {
+			cli();
+			if (uart_putchar_ready)
+				uart_putchar(dequeue());
+
+			sei();
 		}
-		interrupts();
-	}
-	
-	/** this code rules what occurs when the dial button is used **/
-	if (newPosition != oldPosition) {
-		uint8_t inc = newPosition > oldPosition ? -1 : 1;
-		if(!digitalRead(TAPSWT)) 
-			inc *= 10;
+		
+		/** this code rules what occurs when the dial button is used **/
+		if (newPosition != oldPosition) {
+			uint8_t inc = newPosition > oldPosition ? -1 : 1;
+			if(!digitalRead(TAPSWT)) 
+				inc *= 10;
 
-		if (panel == bign) {
-			midi_clock_add(inc);
-			MicroPanel::reload();
-		} else if (panel == midiChannelPanel) {
-			channel = (channel - inc) & 15;
-			MicroPanel::reload();
-			midi_set_channel(channel);
-		} else if (panel == midiTapCCPanel) {
-			tapcc = (tapcc - inc) & 127;
-			MicroPanel::reload();
-		} else if (panel != terminal) {
-			((MicroPanelMenu *)panel)->updateMenu(newPosition > oldPosition ? 1 : -1);
-			MicroPanel::reload();
-			inTap = 0;
+			if (panel == &bign) {
+				midi_clock_add(inc);
+				MicroPanel::reload();
+			} else if (panel == &midiChannelPanel) {
+				channel = (channel - inc) & 15;
+				MicroPanel::reload();
+				midi_set_channel(channel);
+			} else if (panel == &midiTapCCPanel) {
+				tapcc = (tapcc - inc) & 127;
+				MicroPanel::reload();
+			} else if (panel != &terminal) {
+				((MicroPanelMenu *)panel)->updateMenu(newPosition > oldPosition ? 1 : -1);
+				MicroPanel::reload();
+				inTap = 0;
+			}
+
+			oldPosition = newPosition;
 		}
+		
+		/** this code rules what is drawed to screen **/
+		if (panel == &bign)
+			bign.number = midi_clock_getBPM();
+		else if (panel == &midiChannelPanel)
+			midiChannelPanel.number = channel;
+		else if (panel == &midiTapCCPanel)
+			midiTapCCPanel.number = tapcc;
 
-		oldPosition = newPosition;
+		panel->draw();
 	}
-	
-	/** this code rules what is drawed to screen **/
-	if (panel == bign)
-		bign->number = midi_clock_getBPM();
-	else if (panel == midiChannelPanel)
-		midiChannelPanel->number = channel;
-	else if (panel == midiTapCCPanel)
-		midiTapCCPanel->number = tapcc;
 
-	panel->draw();
-}
-
-/** this code rules what occurs when the dial button is clicked **/
-void menuClick()
-{
-	if (panel == mainMenu) {
-		uint8_t x = mainMenu->getCurrItem();
-		switch(x) {
-		case 0:
-			panel = bign;
-			break;
-
-		case 1:
-			panel = terminal;
-			break;
-
-		case 2:
-			panel = configMenu;
-			break;
-
-		case 3:
-			writeConfig();
-			break;
-		}  
-	} else if (panel == buttonMenu1 || panel == buttonMenu2) {
-		uint8_t x = ((MicroPanelCheck *) panel)->getCurrItem();
-		if (x == 3)
-			panel = configMenu;
-		else
-			*(((MicroPanelCheck *) panel)->checkedItem) = x;
-	} else if (panel == configMenu) {
-		uint8_t x = ((MicroPanelMenu *) panel)->getCurrItem();
-		switch(x) {
-		case 0:
-			panel = midiChannelPanel;
-			break;
-		case 1:
-			panel = midiTapCCPanel;
-			break;
-		case 2:
-			panel = buttonMenu1;
-			break;
-		case 3:
-			panel = buttonMenu2;
-			break;		
-		case 4:
-			panel = mainMenu;	
-			break;
-		}
-	} else if (panel == midiChannelPanel || panel == midiTapCCPanel) {
-		panel = configMenu;
-	} else  {
-		panel = mainMenu;
-	}
-	
-	MicroPanel::reload();
+	return 0;
 }

@@ -1,0 +1,3 @@
+[submodule "u8glib"]
+	path = u8glib
+	url = https://github.com/olikraus/u8glib.git
