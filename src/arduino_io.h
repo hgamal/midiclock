@@ -1,6 +1,6 @@
 #pragma once
 
-#define MKPORT(io, pin)	(io << 3) | (pin)
+#define MKPORT(io, pin)	((io << 3) + (pin))
 
 #define INPUT 0x0
 #define OUTPUT 0x1
@@ -8,6 +8,6 @@
 
 // compatible to uint8_t u8g_Pin(uint8_t port, uint8_t bitpos);
 
-void digitalWrite(uint16_t pin, uint8_t value);
-uint8_t digitalRead(uint16_t pin);
-void pinMode(uint16_t pin, uint8_t mode);
+void digitalWrite(uint8_t pin, uint8_t value);
+uint8_t digitalRead(uint8_t pin);
+void pinMode(uint8_t pin, uint8_t mode);

@@ -14,7 +14,10 @@ extern U8GLIB u8g;
 
 void MicroPanel::reload()
 {
-	_reload = 1;
+	if (_reload == 255)
+		return;
+
+	_reload++;
 }
 
 void MicroPanel::drawScreen(MicroPanel *target)
@@ -46,7 +49,8 @@ void MicroPanel::drawScreen(MicroPanel *target)
 
 	//Serial.println("reload = 0");
 
-	_reload = 0;
+	if (_reload)
+		_reload--;
 	state = 0;
 }
 

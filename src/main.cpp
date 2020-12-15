@@ -14,30 +14,31 @@
 #define	HIGH	1
 #define LOW		0
 
-#define TAPSWT  MKPORT(PINC, PC6)
-#define TAPLED  MKPORT(PORTD, PD7)
-#define RXLED   MKPORT(PORTB, PB0)
-#define CLICK   MKPORT(PINE, PE6)
+#define TAPSWT  PN(2, 6)
+#define TAPLED  PN(3, 7)
+#define RXLED   PN(1, 0)
+#define CLICK   PN(4, 6)
 
-#define TAP1	MKPORT(PORTF, PF4)
-#define TAP2	MKPORT(PORTD, PD6)
+#define TAP1	PN(5, 4)
+#define TAP2	PN(2, 6)
 
 // Declaration for SSD1306 display connected using software SPI (default case):
-#define OLED_MOSI  MKPORT(PORTD, PD2)
-#define OLED_CLK   MKPORT(PORTB, PB1)
-#define OLED_DC    MKPORT(PORTF, PF7)
-#define OLED_CS    MKPORT(PORTF, PF5)
-#define OLED_RESET MKPORT(PORTD, PD2)
+#define OLED_MOSI  PN(1, 2)
+#define OLED_CLK   PN(1, 1)
+#define OLED_DC    PN(5, 6)
+#define OLED_CS    PN(5, 5)
+#define OLED_RESET PN(5, 7)
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
-U8GLIB_SSD1306_128X64 u8g(u8g_Pin(PORTF, PF5), u8g_Pin(PORTF,PF7), u8g_Pin(PORTD,PD2));
+U8GLIB_SSD1306_128X64 u8g(OLED_CLK, OLED_MOSI, OLED_CS, OLED_DC, OLED_RESET);
+//U8GLIB_SSD1306_128X64 u8g(OLED_CS, OLED_DC, OLED_RESET);
 
 void menuClick();
 
-#define encoder0PinA PB5	// 9
-#define encoder0PinB PB4	// 8
+#define encoder0PinA PN(1,5)
+#define encoder0PinB PN(1,4)
 
 int16_t oldPosition = 0;
 int16_t newPosition = 0;
@@ -52,6 +53,7 @@ uint8_t currButton = 0;
 uint8_t encoder0PinALast = HIGH;
 uint8_t click=0;
 uint8_t tap=0;
+uint8_t doMenuClick = 0;
 
 #define BT_NORMALY_CLOSED	0
 #define BT_NORMALY_OPEN		1
@@ -208,11 +210,10 @@ void switch_button(uint8_t id, uint8_t state)
 	}
 }
 
-void clock_event()
+ISR(TIMER1_COMPA_vect)          // timer compare interrupt service routine
 {
+	countInt++;
 	uint32_t now = micros();
-
-	clock_processTAP(now);
 
 	if (inTap) {
 	    digitalWrite(TAPLED, HIGH);
@@ -231,29 +232,22 @@ void clock_event()
 	}
 
 	midi_clock_process(now, event_proc);
-}
 
-
-ISR(TIMER1_COMPA_vect)          // timer compare interrupt service routine
-{
-	countInt++;
-	
+/*	
 	static uint8_t dbc=-1;
 	
 	dbc = (dbc + 1) % 20;
 	
 	if (dbc == 0)
 		return;
-
+*/
 	uint8_t n = digitalRead(CLICK);
 	if (debounce(!n, &click) == KEY_DOWN)
-		menuClick();
+		doMenuClick = HIGH;
 
-	MicroPanel::reload();
-
-	n = encoder0PinA;
-	if ((encoder0PinALast == HIGH) && (n == LOW)) {
-		if (encoder0PinB == HIGH)
+	n = digitalRead(encoder0PinA);
+	if (encoder0PinALast && !n) {
+		if (digitalRead(encoder0PinB))
 			newPosition--;
 		else
 			newPosition++;
@@ -364,26 +358,28 @@ extern "C" void __cxa_pure_virtual()
 
 int main()
 {
+	//CLKPR = 0x80; CLKPR = 0x00;
 	uart_init(31250);
 	initTimer0();
 
-	pinMode(1, OUTPUT);
+	pinMode(PN(3,3), OUTPUT);
 	pinMode(RXLED, OUTPUT);
-	//pinMode(21, OUTPUT);
 	pinMode(TAPLED,OUTPUT);
-	pinMode(CLICK,INPUT);
-	pinMode(TAPSWT,INPUT);
-
 	pinMode(TAP1, OUTPUT);
 	pinMode(TAP2, OUTPUT);
-	
-	//pinMode(OLED_MOSI, OUTPUT);
-	//pinMode(OLED_CLK, OUTPUT);
+	pinMode(OLED_MOSI, OUTPUT);
+	pinMode(OLED_CLK, OUTPUT);
 	pinMode(OLED_DC, OUTPUT);
 	pinMode(OLED_CS, OUTPUT);
 	pinMode(OLED_RESET, OUTPUT);
 
-	// u8g.setContrast(255);
+	pinMode(PN(3,2), INPUT);
+	pinMode(TAPSWT, INPUT);
+	pinMode(CLICK, INPUT);
+	pinMode(encoder0PinA, INPUT);
+	pinMode(encoder0PinB, INPUT);
+
+	u8g.setContrast(255);
 	u8g.setColorIndex(1);
 	u8g.setFont(u8g_font_6x13B);
 		
@@ -395,15 +391,15 @@ int main()
 	readConfig();
 #endif
 
-	midi_set_channel(channel);
-	midi_clock_init(micros());
+	//midi_set_channel(channel);
+	//midi_clock_init(micros());
 	
 	MicroPanel::reload();
 	terminal.puts("Messages\n");
 
-	while (1) {
-		clock_event();
+	uint32_t now, oldCheck=0;
 
+	while (1) {
 		/** purge serial characters **/
 		if (!empty()) {
 			cli();
@@ -412,7 +408,18 @@ int main()
 
 			sei();
 		}
-		
+
+		now = micros();
+		if (oldCheck - now > 1000) {
+			clock_processTAP(now);
+			oldCheck = now;
+		}
+
+		if (doMenuClick) {
+			menuClick();
+			doMenuClick = 0;
+		}	
+
 		/** this code rules what occurs when the dial button is used **/
 		if (newPosition != oldPosition) {
 			uint8_t inc = newPosition > oldPosition ? -1 : 1;

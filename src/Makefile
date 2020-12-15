@@ -14,7 +14,7 @@ CCOPTS=-Os -D__AVR__ -DF_CPU=16000000UL -mmcu=$(MCU) -ffunction-sections -fdata-
 CPPOPTS=-fno-threadsafe-statics 
 #CCOPTS=-Os -DF_CPU=16000000UL -mmcu=$(MCU) -DXDEBUG -I ../u8glib/csrc -I ../u8glib/cppsrc -I ../u8glib/nonarduino
 #CCOPTS=-Os -DF_CPU=8000000UL -mmcu=$(MCU) -DXDEBUG -I../u8g2/csrc/
-PGMOPT=-B8 -v -pm32u4 -cavr109 -P/dev/ttyACM0 -b57600
+PGMOPT=-D -B8 -v -pm32u4 -cavr109 -P/dev/ttyACM0 -b57600
 
 # U8glib path to c source files
 U8GPATH:=$(abspath ../u8glib/csrc/)
@@ -51,7 +51,7 @@ $(TARGET):	$(ELF) $(BUILD_DIR)
 
 $(ELF):	${OBJS} $(BUILD_DIR)/libu8g.a
 	echo ${U8GCPPSRCS}
-	avr-gcc ${CCOPTS} -L${BUILD_DIR} -Wl,-Map,$(basename $@).map -o $@ ${OBJS} -lu8g
+	avr-gcc ${CCOPTS} -L${BUILD_DIR} -Wl,--gc-sections -Wl,-Map,$(basename $@).map -o $@ ${OBJS} -lu8g
 	avr-size   --mcu=atmega32u4 $(ELF)
 
 $(BUILD_DIR):
