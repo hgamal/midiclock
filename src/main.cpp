@@ -391,8 +391,8 @@ int main()
 	readConfig();
 #endif
 
-	//midi_set_channel(channel);
-	//midi_clock_init(micros());
+	midi_set_channel(channel);
+	midi_clock_init(micros());
 	
 	MicroPanel::reload();
 	terminal.puts("Messages\n");
