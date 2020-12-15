@@ -1,6 +1,7 @@
 #include <avr/io.h>
 #include <util/delay.h>
 #include <avr/interrupt.h>
+#include <avr/eeprom.h>
 #include <U8glib.h>
 
 #include "debounce.h"
@@ -63,6 +64,7 @@ uint8_t doMenuClick = 0;
 uint8_t channel = 1;
 uint8_t tapcc = 64;
 uint8_t buttonType[2] = { BT_NORMALY_CLOSED, BT_NORMALY_OPEN };
+uint16_t bpmConfig = 100;
 
 const char *main_itens[] = { "BPM View", "Messages", "Config", "Save", NULL };
 const char *button_itens[] = { "Normaly Closed", "Normaly Opened", "Latched", "Return", NULL };
@@ -79,42 +81,43 @@ MicroPanelBigNumber midiTapCCPanel("TAP CC", 0);
 
 MicroPanel *panel = &mainMenu;
 
-#ifdef ECONFIG
 void readConfig()
 {
-	channel = EEPROM.read(1);
-	tapcc	= EEPROM.read(2);
-	buttonType[0] = EEPROM.read(3);
-	buttonType[1] = EEPROM.read(4);
+	channel = eeprom_read_byte((uint8_t *) 1);
+	tapcc	= eeprom_read_byte((uint8_t *) 2);
+	buttonType[0] = eeprom_read_byte((uint8_t *) 3);
+	buttonType[1] = eeprom_read_byte((uint8_t *) 4);
+	bpmConfig = eeprom_read_word((uint16_t *) 5);
 }
 
 void writeConfig()
 {
-	EEPROM.update(1, channel);
+	eeprom_update_byte((uint8_t *) 1, channel);
 	if (channel > 15)
 		channel = 1;
 		
-	EEPROM.update(2, tapcc);
+	eeprom_update_byte((uint8_t *) 2, tapcc);
 	if (tapcc > 127)
 		tapcc = 64;
 		
-	EEPROM.update(3, buttonType[0]);
+	eeprom_update_byte((uint8_t *) 3, buttonType[0]);
 	if (buttonType[0] > BT_LATCHED)
 		buttonType[0] = BT_NORMALY_CLOSED;
 		
-	EEPROM.update(4, buttonType[1]);
+	eeprom_update_byte((uint8_t *) 4, buttonType[1]);
 	if (buttonType[1] > BT_LATCHED)
 		buttonType[1] = BT_NORMALY_OPEN;
+
+	eeprom_update_word((uint16_t *) 5, bpmConfig);
 }
-#endif
 
 void clock_process_MIDIClock(uint32_t now)
 {
 	static uint32_t old_time = 0;
 	uint32_t diff = now - old_time;
 
-	uint16_t new_bpm = 25000000UL / diff;
-	midi_clock_setBPM(new_bpm);
+	bpmConfig = 25000000UL / diff;
+	midi_clock_setBPM(bpmConfig);
 
 	inTap = 0;
 	old_time = now;
@@ -138,8 +141,8 @@ void clock_processTAP(uint32_t now, bool midi=false)
 			return;
 		}	
 
-		uint16_t new_bpm = 60000000UL / diff;
-		midi_clock_setBPM(new_bpm);
+		bpmConfig = 60000000UL / diff;
+		midi_clock_setBPM(bpmConfig);
 
 		inTap = 0;
 		old_time = now;
@@ -312,9 +315,7 @@ void menuClick()
 			break;
 
 		case 3:
-#ifdef ECONFIG
 			writeConfig();
-#endif
 			break;
 		}  
 	} else if (panel == &buttonMenu1 || panel == &buttonMenu2) {
@@ -387,10 +388,9 @@ int main()
 	
 	initCounter();
 
-#ifdef ECONFIG
 	readConfig();
-#endif
 
+	midi_clock_setBPM(bpmConfig);
 	midi_set_channel(channel);
 	midi_clock_init(micros());
 	
@@ -447,7 +447,7 @@ int main()
 		
 		/** this code rules what is drawed to screen **/
 		if (panel == &bign)
-			bign.number = midi_clock_getBPM();
+			bpmConfig = bign.number = midi_clock_getBPM();
 		else if (panel == &midiChannelPanel)
 			midiChannelPanel.number = channel;
 		else if (panel == &midiTapCCPanel)
