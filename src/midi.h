@@ -24,7 +24,7 @@ typedef void (*midi_event)(uint8_t, uint8_t, uint8_t);
 void midi_evaluate_state(uint8_t ReceivedByte, midi_event);
 void midi_set_channel(uint8_t channel);
 
-void midi_clock_init(uint32_t now);
+void midi_clock_init(uint32_t now, uint16_t bpm);
 void midi_clock_setBPM(uint16_t bpm);
 void midi_clock_add(int8_t amount);
 uint16_t midi_clock_getBPM(void);

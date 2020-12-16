@@ -64,7 +64,7 @@ uint8_t doMenuClick = 0;
 uint8_t channel = 1;
 uint8_t tapcc = 64;
 uint8_t buttonType[2] = { BT_NORMALY_CLOSED, BT_NORMALY_OPEN };
-uint16_t bpmConfig = 100;
+uint16_t bpmConfig = 200;
 
 const char *main_itens[] = { "BPM View", "Messages", "Config", "Save", NULL };
 const char *button_itens[] = { "Normaly Closed", "Normaly Opened", "Latched", "Return", NULL };
@@ -173,7 +173,6 @@ void event_midi_proc(uint8_t message, uint8_t control, uint8_t value)
 		uint32_t now = micros();
 		clock_processTAP(now, true);
     	terminal.printf("\nTAP %d\n", midi_clock_getBPM());
-		
 	}
 }
 
@@ -262,8 +261,6 @@ ISR(TIMER1_COMPA_vect)          // timer compare interrupt service routine
 
 void initCounter(void)
 {
-	cli();           // disable all interrupts
-	
 	// initialize timer1 
 	TCCR1A = 0;
 	TCCR1B = 0;
@@ -292,8 +289,6 @@ void initCounter(void)
 #endif
 	TCCR1B |= (1 << WGM12);   // CTC mode
 	TIMSK1 |= (1 << OCIE1A);  // enable timer compare interrupt
-	
-	sei(); 
 }
 
 /** this code rules what occurs when the dial button is clicked **/
@@ -359,6 +354,8 @@ extern "C" void __cxa_pure_virtual()
 
 int main()
 {
+	cli();
+
 	//CLKPR = 0x80; CLKPR = 0x00;
 	uart_init(31250);
 	initTimer0();
@@ -390,12 +387,13 @@ int main()
 
 	readConfig();
 
-	midi_clock_setBPM(bpmConfig);
 	midi_set_channel(channel);
-	midi_clock_init(micros());
+	midi_clock_init(micros(), bpmConfig);
 	
 	MicroPanel::reload();
 	terminal.puts("Messages\n");
+
+	sei();
 
 	uint32_t now, oldCheck=0;
 

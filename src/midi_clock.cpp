@@ -6,11 +6,11 @@ static uint16_t bpm;
 static uint32_t absolute_position = 0;
 static uint32_t clk_period_us = 0;
 
-void midi_clock_init(uint32_t now)
+void midi_clock_init(uint32_t now, uint16_t startBPM)
 {
 	absolute_position = 0;
 	lastClock = now;
-	midi_clock_setBPM(100);
+	midi_clock_setBPM(startBPM);
 }
 
 void midi_clock_setBPM(uint16_t _bpm)
