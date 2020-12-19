@@ -24,9 +24,10 @@ void midi_evaluate_state(uint8_t receivedByte, midi_event proc)
 		} else {
 			uint8_t midi_curr_channel = receivedByte & 0xf;
 			
-			if (midi_curr_channel == midi_selected_channel) {
+			if (midi_selected_channel == 0 || // OMNI
+				midi_curr_channel == midi_selected_channel-1) {
 				midi_curr_cmd = receivedByte & 0xf0;
-	
+
 				if (midi_curr_cmd  == 0xB0)
 					midi_curr_state = MIDI_STATE_WAIT_FOR_CONTROLLER_ID;
 			}
