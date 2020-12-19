@@ -176,7 +176,7 @@ void event_midi_proc(uint8_t message, uint8_t control, uint8_t value)
 	}
 }
 
-void serialEvent1() 
+ISR(USART1_RX_vect)
 {
 	while (uart_getchar_ready()) {
 	    // get the new byte:
@@ -401,7 +401,7 @@ int main()
 		/** purge serial characters **/
 		if (!empty()) {
 			cli();
-			if (uart_putchar_ready)
+			if (uart_putchar_ready())
 				uart_putchar(dequeue());
 
 			sei();

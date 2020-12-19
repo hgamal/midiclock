@@ -2,6 +2,8 @@
 #include <avr/interrupt.h>
 
 #include "uart.h"
+
+/*
 #include "midi.h"
 #include "squeue.h"
 
@@ -13,6 +15,7 @@ ISR(USART1_RX_vect)
 	//midi_evaluate_state(ReceivedByte);
 	enqueue(ReceivedByte);
 }
+*/
 
 void uart_init(int baud)
 {
