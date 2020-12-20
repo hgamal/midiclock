@@ -123,31 +123,30 @@ void clock_process_MIDIClock(uint32_t now)
 	old_time = now;
 }
 
-void clock_processTAP(uint32_t now, bool midi=false)
+void clock_processTAP()
 {
 	static uint32_t old_time = 0;
+	uint32_t now = micros();
 	uint32_t diff = now - old_time;
-	uint8_t n = digitalRead(TAPSWT);
-	
+
+	if (!old_time) {
+		inTap = 1;
+		old_time = now;
+		return;
+	}	
+
 	if (diff > MAX_TIME) {
 		old_time = 0;
 		inTap = 0;
+		return;
 	}
-	
-	if (midi || debounce(!n, &tap) == KEY_DOWN) {
-		if (!old_time) {
-			inTap = 1;
-			old_time = now;
-			return;
-		}	
 
-		bpmConfig = 60000000UL / diff;
-		midi_clock_setBPM(bpmConfig);
+	bpmConfig = 60000000UL / diff;
+	midi_clock_setBPM(bpmConfig);
+	MicroPanel::reload();
 
-		inTap = 0;
-		old_time = now;
-		MicroPanel::reload();
-	}
+	inTap = 0;
+	old_time = now;
 }
 
 void sendMIDI(uint8_t message)
@@ -170,8 +169,7 @@ void event_proc(uint8_t message, uint32_t absolute_position, uint16_t bpm)
 void event_midi_proc(uint8_t message, uint8_t control, uint8_t value)
 {	
 	if (((message & 0xf0) == 0xB0) && (control == tapcc) && (value == 127)) {
-		uint32_t now = micros();
-		clock_processTAP(now, true);
+		clock_processTAP();
     	terminal.printf("\nTAP %d\n", midi_clock_getBPM());
 	}
 }
@@ -214,8 +212,10 @@ void switch_button(uint8_t id, uint8_t state)
 
 ISR(TIMER1_COMPA_vect)          // timer compare interrupt service routine
 {
-	countInt++;
 	uint32_t now = micros();
+	midi_clock_process(now, event_proc);
+
+	countInt++;
 
 	if (inTap) {
 	    digitalWrite(TAPLED, HIGH);
@@ -233,16 +233,6 @@ ISR(TIMER1_COMPA_vect)          // timer compare interrupt service routine
 		}
 	}
 
-	midi_clock_process(now, event_proc);
-
-/*	
-	static uint8_t dbc=-1;
-	
-	dbc = (dbc + 1) % 20;
-	
-	if (dbc == 0)
-		return;
-*/
 	uint8_t n = digitalRead(CLICK);
 	if (debounce(!n, &click) == KEY_DOWN)
 		doMenuClick = HIGH;
@@ -377,6 +367,8 @@ int main()
 	pinMode(encoder0PinA, INPUT);
 	pinMode(encoder0PinB, INPUT);
 
+	MicroPanel::init(&u8g);
+
 	u8g.setContrast(255);
 	u8g.setColorIndex(1);
 	u8g.setFont(u8g_font_6x13B);
@@ -407,16 +399,14 @@ int main()
 			sei();
 		}
 
-		now = micros();
-		if (oldCheck - now > 1000) {
-			clock_processTAP(now);
-			oldCheck = now;
-		}
-
 		if (doMenuClick) {
 			menuClick();
 			doMenuClick = 0;
-		}	
+		}
+
+		uint8_t n = digitalRead(TAPSWT);
+		if (debounce(!n, &tap) == KEY_DOWN)
+			clock_processTAP();
 
 		/** this code rules what occurs when the dial button is used **/
 		if (newPosition != oldPosition) {
