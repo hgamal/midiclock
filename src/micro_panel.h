@@ -2,6 +2,7 @@
 
 class MicroPanel  {
 protected:
+	static class U8GLIB *u8g;
 	static void drawScreen(MicroPanel *target);
 	virtual void _draw() = 0;
 
@@ -11,6 +12,7 @@ public:
 	virtual void draw();
 
 	static void reload();
+	static void init(U8GLIB *_u8g);
 };
 
 class MicroPanelTerminal: public MicroPanel {

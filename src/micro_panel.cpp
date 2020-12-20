@@ -9,8 +9,12 @@ static uint8_t x=0, y=0;
 static char _buffer[64];
 static uint8_t _reload = 0;
 
-// U8GLIB_SSD1306_128X64
-extern U8GLIB u8g;
+class U8GLIB *MicroPanel::u8g = NULL;
+
+void MicroPanel::init(U8GLIB *_u8g)
+{
+	u8g = _u8g; 
+}
 
 void MicroPanel::reload()
 {
@@ -31,7 +35,7 @@ void MicroPanel::drawScreen(MicroPanel *target)
 	//Serial.println(buffer);
 	
 	if (state == 0) {
-		u8g.firstPage();
+		u8g->firstPage();
 		state = 1;
 		return;
 	}
@@ -42,7 +46,7 @@ void MicroPanel::drawScreen(MicroPanel *target)
 		return;
 	}
 	
-	if (state == 2 && u8g.nextPage()) {
+	if (state == 2 && u8g->nextPage()) {
 		state = 1;
 		return;
 	}
@@ -75,21 +79,21 @@ MicroPanelMenu::MicroPanelMenu(const char **_menuItens):
 void MicroPanelMenu::_draw() {
 	uint8_t i, h;
 	u8g_uint_t w, d;
-	u8g.setFont(u8g_font_6x13);
-	u8g.setFontRefHeightText();
-	u8g.setFontPosTop();
-	h = u8g.getFontAscent()-u8g.getFontDescent();
-	w = u8g.getWidth();
+	u8g->setFont(u8g_font_6x13);
+	u8g->setFontRefHeightText();
+	u8g->setFontPosTop();
+	h = u8g->getFontAscent()-u8g->getFontDescent();
+	w = u8g->getWidth();
 	for(i = 0; i < menuItensCount; i++) {        // draw all menu items
 		// Serial.println(menuStrings[i]);
-		d = (w-u8g.getStrWidth(menuStrings[i]))/2;
-		u8g.setDefaultForegroundColor();
+		d = (w-u8g->getStrWidth(menuStrings[i]))/2;
+		u8g->setDefaultForegroundColor();
 		if (i == menuCurrent) {                   // current selected menu item
-			u8g.drawBox(0, i*h+1, w, h);            // draw cursor bar
-			u8g.setDefaultBackgroundColor();
+			u8g->drawBox(0, i*h+1, w, h);            // draw cursor bar
+			u8g->setDefaultBackgroundColor();
 		}
 		
-		u8g.drawStr(d, i*h, menuStrings[i]);
+		u8g->drawStr(d, i*h, menuStrings[i]);
 	}
 }
 
@@ -141,23 +145,23 @@ void MicroPanelCheck::_draw() {
   uint8_t i, h;
 
   u8g_uint_t w, d;
-  u8g.setFont(u8g_font_6x13);
-  u8g.setFontRefHeightText();
-  u8g.setFontPosTop();
-  h = u8g.getFontAscent()-u8g.getFontDescent();
-  w = u8g.getWidth();
+  u8g->setFont(u8g_font_6x13);
+  u8g->setFontRefHeightText();
+  u8g->setFontPosTop();
+  h = u8g->getFontAscent()-u8g->getFontDescent();
+  w = u8g->getWidth();
   for(i = 0; i < menuItensCount; i++) {        // draw all menu items
     // Serial.println(menuStrings[i]);
-    d = (w-u8g.getStrWidth(menuStrings[i]))/2;
-    u8g.setDefaultForegroundColor();
+    d = (w-u8g->getStrWidth(menuStrings[i]))/2;
+    u8g->setDefaultForegroundColor();
     if (i == menuCurrent) {                   // current selected menu item
-      u8g.drawBox(0, i*h+1, w, h);            // draw cursor bar
-      u8g.setDefaultBackgroundColor();
+      u8g->drawBox(0, i*h+1, w, h);            // draw cursor bar
+      u8g->setDefaultBackgroundColor();
     }
-    u8g.drawStr(d, i*h, menuStrings[i]);
+    u8g->drawStr(d, i*h, menuStrings[i]);
 	
     if (i == *checkedItem)
-		u8g.drawBitmapP(2, i*h+2, 1, 8, check_bitmap);
+		u8g->drawBitmapP(2, i*h+2, 1, 8, check_bitmap);
   }
 }
 
@@ -175,14 +179,14 @@ void MicroPanelTerminal::clear()
 
 void MicroPanelTerminal::_draw()
 {
-	u8g.setFont(u8g_font_6x13);
-	u8g.setDefaultForegroundColor();
-	uint8_t h = u8g.getFontAscent()-u8g.getFontDescent();
+	u8g->setFont(u8g_font_6x13);
+	u8g->setDefaultForegroundColor();
+	uint8_t h = u8g->getFontAscent()-u8g->getFontDescent();
 	uint8_t t = 0;
-	u8g.drawStr(0, t, (const char *) buffer);
-	u8g.drawStr(0, t+=h, (const char *) (buffer+1));
-	u8g.drawStr(0, t+=h, (const char *) (buffer+2));
-	u8g.drawStr(0, t+=h, (const char *) (buffer+3));
+	u8g->drawStr(0, t, (const char *) buffer);
+	u8g->drawStr(0, t+=h, (const char *) (buffer+1));
+	u8g->drawStr(0, t+=h, (const char *) (buffer+2));
+	u8g->drawStr(0, t+=h, (const char *) (buffer+3));
 }
 
 void MicroPanelTerminal::puts(const char *p)
@@ -240,18 +244,18 @@ void MicroPanelBigNumber::_draw()
 	uint8_t w;
 	uint8_t h;
 	if (title) {
-		u8g.setFont(u8g_font_6x13);
-		w = u8g.getStrWidth(title);
-		h = u8g.getFontAscent() - u8g.getFontDescent();
-		u8g.drawStr((128-w)/2, h, title);
+		u8g->setFont(u8g_font_6x13);
+		w = u8g->getStrWidth(title);
+		h = u8g->getFontAscent() - u8g->getFontDescent();
+		u8g->drawStr((128-w)/2, h, title);
 	}
 
-	u8g.setFont(u8g_font_fub35n);
-	u8g.setDefaultForegroundColor();
+	u8g->setFont(u8g_font_fub35n);
+	u8g->setDefaultForegroundColor();
 	sprintf(_buffer, "%d", number);
-	h = u8g.getFontAscent() - u8g.getFontDescent();
-	w = u8g.getStrWidth(_buffer);
-	u8g.drawStr((128-w)/2, 64-(64-h)/2, _buffer);
+	h = u8g->getFontAscent() - u8g->getFontDescent();
+	w = u8g->getStrWidth(_buffer);
+	u8g->drawStr((128-w)/2, 64-(64-h)/2, _buffer);
 }
 
 
