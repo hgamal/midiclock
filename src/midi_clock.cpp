@@ -37,7 +37,14 @@ uint16_t midi_clock_getBPM(void)
 
 uint32_t midi_clock_process(uint32_t now, midi_clock_event event_proc)
 {
-	uint32_t diff = now - lastClock;
+	uint32_t diff;
+
+	// check if there was 'now' overflow (every 4.294,97 seconds or 71,59 minutes)
+	if (now > lastClock) 
+		diff = now - lastClock;
+	else
+		diff = 4294967295UL - lastClock + now;
+
 	if (diff  >= clk_period_us) {
 		lastClock = now - (diff - clk_period_us);
 		
