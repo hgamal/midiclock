@@ -10,11 +10,13 @@ TARGET=midiclock.hex
 
 BUILD_DIR = build
 
-CCOPTS=-Os -D__AVR__ -DF_CPU=16000000UL -mmcu=$(MCU) -ffunction-sections -fdata-sections -DXDEBUG -I ../u8glib/csrc -I ../u8glib/cppsrc -I ../u8glib/nonarduino
-CPPOPTS=-fno-threadsafe-statics 
+CCOPTS=-Os -D__AVR__ -DF_CPU=16000000UL -mmcu=$(MCU) -ffunction-sections -fdata-sections -I ../u8glib/csrc -I ../u8glib/cppsrc -I ../u8glib/nonarduino
+CPPOPTS=-fno-threadsafe-statics -fno-exceptions 
 #CCOPTS=-Os -DF_CPU=16000000UL -mmcu=$(MCU) -DXDEBUG -I ../u8glib/csrc -I ../u8glib/cppsrc -I ../u8glib/nonarduino
 #CCOPTS=-Os -DF_CPU=8000000UL -mmcu=$(MCU) -DXDEBUG -I../u8g2/csrc/
-PGMOPT=-D -B8 -v -pm32u4 -cavr109 -P/dev/ttyACM0 -b57600
+# PGMOPT=-D -B8 -v -pm32u4 -cavr109 -P/dev/ttyACM0 -b57600
+PGMPORT=/dev/ttyACM0
+PGMOPT=-D -v -patmega32u4 -cavr109 -P${PGMPORT} -b57600
 
 # U8glib path to c source files
 U8GPATH:=$(abspath ../u8glib/csrc/)
@@ -49,10 +51,12 @@ $(BUILD_DIR)/%.o: %.cpp
 $(TARGET):	$(ELF) $(BUILD_DIR)
 	avr-objcopy -O ihex -R .eeprom $(ELF) $(TARGET)
 
+#avr-objcopy" -O ihex -j .eeprom --set-section-flags=.eeprom=alloc,load --no-change-warnings --change-section-lma .eeprom=0  "/tmp/arduino_build_699981/midiclock.ino.elf" "/tmp/arduino_build_699981/midiclock.ino.eep"
+#avr-objcopy" -O ihex -R .eeprom  "/tmp/arduino_build_699981/midiclock.ino.elf" "/tmp/arduino_build_699981/midiclock.ino.hex"
+
 $(ELF):	${OBJS} $(BUILD_DIR)/libu8g.a
-	echo ${U8GCPPSRCS}
-	avr-gcc ${CCOPTS} -L${BUILD_DIR} -Wl,--gc-sections -Wl,-Map,$(basename $@).map -o $@ ${OBJS} -lu8g
-	avr-size   --mcu=atmega32u4 $(ELF)
+	avr-gcc ${CCOPTS} -L${BUILD_DIR} -fuse-linker-plugin  -Wl,--gc-sections -Wl,-Map,$(basename $@).map -o $@ ${OBJS} -lu8g
+	avr-size --mcu=atmega32u4 $(ELF)
 
 $(BUILD_DIR):
 	mkdir $(BUILD_DIR)
@@ -64,7 +68,9 @@ status:
 	avrdude ${PGMOPT}
 
 program: $(TARGET)
+	stty -F ${PGMPORT} 1200
 	avrdude ${PGMOPT} -U flash:w:$(TARGET):i
+	stty -F ${PGMPORT} 1200
 
 pgmread:
 	avrdude ${PGMOPT} -U flash:r:read.hex:i
