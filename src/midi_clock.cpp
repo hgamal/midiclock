@@ -37,8 +37,9 @@ uint16_t midi_clock_getBPM(void)
 
 uint32_t midi_clock_process(uint32_t now, midi_clock_event event_proc)
 {
-	if (now - lastClock >= clk_period_us) {
-		lastClock = now;
+	uint32_t diff = now - lastClock;
+	if (diff  >= clk_period_us) {
+		lastClock = now - (diff - clk_period_us);
 		
 		// Send a clock, bypasing the transmit queue
 		if (event_proc)
