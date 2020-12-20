@@ -44,8 +44,8 @@ MicroPanel *panel = mainMenu;
 #define encoder0PinA 9
 #define encoder0PinB 8
 
-int16_t oldPosition = 0;
-int16_t newPosition = 0;
+int16_t encoderOldPosition = 0;
+int16_t encoderPosition = 0;
 uint16_t blinkTime = 0;
 uint32_t countInt = 0;
 uint8_t inTap = 0;
@@ -97,7 +97,7 @@ void writeConfig()
 }
 
 
-void clock_process_MIDIClock(uint32_t now)
+void processMIDIClock(uint32_t now)
 {
 	static uint32_t old_time = 0;
 	uint32_t diff = now - old_time;
@@ -109,7 +109,7 @@ void clock_process_MIDIClock(uint32_t now)
 	old_time = now;
 }
 
-void clock_processTAP(uint32_t now, bool midi=false)
+void processTAP(uint32_t now, bool midi=false)
 {
 	static uint32_t old_time = 0;
 	uint32_t diff = now - old_time;
@@ -148,7 +148,7 @@ void sendMIDI(uint8_t message)
 	}
 }
 
-void event_proc(uint8_t message, uint32_t absolute_position, uint16_t bpm)
+void eventClockProc(uint8_t message, uint32_t absolute_position, uint16_t bpm)
 {
 	
 	if (absolute_position % 24 == 0)
@@ -157,11 +157,11 @@ void event_proc(uint8_t message, uint32_t absolute_position, uint16_t bpm)
 	sendMIDI(message);
 }
 
-void event_midi_proc(uint8_t message, uint8_t control, uint8_t value)
+void eventMidiProc(uint8_t message, uint8_t control, uint8_t value)
 {	
 	if (((message & 0xf0) == 0xB0) && (control == tapcc) && (value == 127)) {
 		uint32_t now = micros();
-		clock_processTAP(now, true);
+		processTAP(now, true);
     	terminal->printf("\nTAP %d\n", midi_clock_getBPM());
 		
 	}
@@ -175,7 +175,7 @@ void serialEvent1()
     	
 		terminal->printf("%02x ", message & 0xff);
 		
-		midi_evaluate_state(message, event_midi_proc);
+		midi_evaluate_state(message, eventMidiProc);
 		
 		sendMIDI(message);
 		
@@ -183,7 +183,7 @@ void serialEvent1()
   	}
 }
 
-void switch_button(uint8_t id, uint8_t state)
+void switchButton(uint8_t id, uint8_t state)
 {
 	if (buttonState[id] != state) {
 		switch(buttonType[id]) {
@@ -207,7 +207,7 @@ void clock_event()
 {
 	uint32_t now = micros();
 
-	clock_processTAP(now);
+	processTAP(now);
 
 	if (inTap) {
 	    digitalWrite(TAPLED, HIGH);
@@ -215,17 +215,17 @@ void clock_event()
 		if (blinkTime) {
 		  if (--blinkTime == 0) {
 		    digitalWrite(TAPLED, LOW);
-		    switch_button(0, LOW);
-		    switch_button(1, LOW);
+		    switchButton(0, LOW);
+		    switchButton(1, LOW);
 		  } else {
 		    digitalWrite(TAPLED, HIGH);
-		    switch_button(0, HIGH);
-		    switch_button(1, HIGH);
+		    switchButton(0, HIGH);
+		    switchButton(1, HIGH);
 		  }
 		}
 	}
 
-	midi_clock_process(now, event_proc);
+	midi_clock_process(now, eventClockProc);
 	
 }
 
@@ -253,10 +253,10 @@ ISR(TIMER1_COMPA_vect)          // timer compare interrupt service routine
 	n = digitalRead(encoder0PinA);
 	if ((encoder0PinALast == HIGH) && (n == LOW)) {
 		if (digitalRead(encoder0PinB) == HIGH)
-			newPosition--;
+			encoderPosition--;
 		else
-			newPosition++;
-		//Serial.println(newPosition);
+			encoderPosition++;
+		//Serial.println(encoderPosition);
 		digitalWrite(RXLED, digitalRead(RXLED) ^ 1);
 	}
 	encoder0PinALast = n;
@@ -342,7 +342,7 @@ void setup()
 	midi_clock_init(micros());
 	
 	MicroPanel::reload();
-	terminal->puts("Meesages\n");
+	terminal->puts("Messages\n");
 }
 
 void loop() 
@@ -358,8 +358,8 @@ void loop()
 	}
 	
 	/** this code rules what occurs when the dial button is used **/
-	if (newPosition != oldPosition) {
-		uint8_t inc = newPosition > oldPosition ? -1 : 1;
+	if (encoderPosition != encoderOldPosition) {
+		uint8_t inc = encoderPosition > encoderOldPosition ? -1 : 1;
 		if(!digitalRead(TAPSWT)) 
 			inc *= 10;
 
@@ -374,12 +374,12 @@ void loop()
 			tapcc = (tapcc - inc) & 127;
 			MicroPanel::reload();
 		} else if (panel != terminal) {
-			((MicroPanelMenu *)panel)->updateMenu(newPosition > oldPosition ? 1 : -1);
+			((MicroPanelMenu *)panel)->updateMenu(encoderPosition > encoderOldPosition ? 1 : -1);
 			MicroPanel::reload();
 			inTap = 0;
 		}
 
-		oldPosition = newPosition;
+		encoderOldPosition = encoderPosition;
 	}
 	
 	/** this code rules what is drawed to screen **/
