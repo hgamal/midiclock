@@ -8,6 +8,7 @@ static char buffer[4][22];
 static uint8_t x=0, y=0;
 static char _buffer[64];
 static uint8_t _reload = 0;
+static uint8_t state=0;
 
 class U8GLIB *MicroPanel::u8g = NULL;
 
@@ -18,16 +19,15 @@ void MicroPanel::init(U8GLIB *_u8g)
 
 void MicroPanel::reload()
 {
+	state = 0;
 	if (_reload == 255)
 		return;
 
 	_reload++;
 }
 
-void MicroPanel::drawScreen(MicroPanel *target)
+void MicroPanel::refresh(MicroPanel *target)
 {
-	static uint8_t state=0;
-	
 	if (!_reload)
 		return;
 
@@ -41,7 +41,7 @@ void MicroPanel::drawScreen(MicroPanel *target)
 	}
 	
 	if (state == 1) {
-		target->_draw();
+		target->draw();
 		state = 2;
 		return;
 	}
@@ -58,9 +58,9 @@ void MicroPanel::drawScreen(MicroPanel *target)
 	state = 0;
 }
 
-void MicroPanel::draw()
+void MicroPanel::refresh()
 {
-	drawScreen(this);
+	refresh(this);
 }
 
 MicroPanel::MicroPanel()
@@ -76,7 +76,7 @@ MicroPanelMenu::MicroPanelMenu(const char **_menuItens):
 		menuItensCount++;
 }
 
-void MicroPanelMenu::_draw() {
+void MicroPanelMenu::draw() {
 	uint8_t i, h;
 	u8g_uint_t w, d;
 	u8g->setFont(u8g_font_6x13);
@@ -141,7 +141,7 @@ static const uint8_t check_bitmap[] U8G_PROGMEM = {
   0x08          // 00001000
 };
 
-void MicroPanelCheck::_draw() {
+void MicroPanelCheck::draw() {
   uint8_t i, h;
 
   u8g_uint_t w, d;
@@ -177,7 +177,7 @@ void MicroPanelTerminal::clear()
 }
 
 
-void MicroPanelTerminal::_draw()
+void MicroPanelTerminal::draw()
 {
 	u8g->setFont(u8g_font_6x13);
 	u8g->setDefaultForegroundColor();
@@ -239,7 +239,7 @@ MicroPanelBigNumber::MicroPanelBigNumber(const char *_title, uint16_t _number):
 {	
 }
 	
-void MicroPanelBigNumber::_draw() 
+void MicroPanelBigNumber::draw() 
 {
 	uint8_t w;
 	uint8_t h;

@@ -3,20 +3,20 @@
 class MicroPanel  {
 protected:
 	static class U8GLIB *u8g;
-	static void drawScreen(MicroPanel *target);
-	virtual void _draw() = 0;
+	static void refresh(MicroPanel *target);
 
 public:
 	MicroPanel();
 
-	virtual void draw();
+	virtual void draw() = 0;
+	virtual void refresh();
 
 	static void reload();
 	static void init(U8GLIB *_u8g);
 };
 
 class MicroPanelTerminal: public MicroPanel {
-	virtual void _draw();
+	virtual void draw();
 public:
 	MicroPanelTerminal();
 
@@ -37,7 +37,7 @@ public:
 	uint8_t getCurrItem(void);
 	void setCurrItem(uint8_t pos);
 	
-	virtual void _draw();
+	virtual void draw();
 };
 
 class MicroPanelCheck : public MicroPanelMenu {
@@ -46,7 +46,7 @@ public:
 	
 	MicroPanelCheck(const char **_menuItens, uint8_t *checkItem);
 	
-	virtual void _draw();
+	virtual void draw();
 };
 
 class MicroPanelBigNumber: public MicroPanel {
@@ -56,7 +56,7 @@ public:
 	
 	MicroPanelBigNumber(const char *_title, uint16_t _number);
 	
-	virtual void _draw();
+	virtual void draw();
 };
 
 

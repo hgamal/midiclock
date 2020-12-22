@@ -175,7 +175,7 @@ ISR(USART1_RX_vect)
     	
 		terminal.printf("%02x ", message & 0xff);
 		
-		midi_evaluate_state(message, eventMidiProc);
+		midi_evaluate_state(message);
 		
 		sendMIDI(message);
 		
@@ -206,7 +206,7 @@ void switchButton(uint8_t id, uint8_t state)
 ISR(TIMER1_COMPA_vect)          // timer compare interrupt service routine
 {
 	uint32_t now = micros();
-	midi_clock_process(now, eventClockProc);
+	midi_clock_process(now);
 
 	if (inTap) {
 	    digitalWrite(TAPLED, HIGH);
@@ -319,6 +319,7 @@ int main()
 
 	uart_init(31250);
 	initTimer0();
+	midi_init(eventMidiProc, eventClockProc);
 
 	pinMode(PN(3,3), OUTPUT);
 	pinMode(RXLED, OUTPUT);
@@ -429,7 +430,7 @@ int main()
 		else if (panel == &midiTapCCPanel)
 			midiTapCCPanel.number = tapcc;
 
-		panel->draw();
+		panel->refresh();
 	}
 
 	return 0;
