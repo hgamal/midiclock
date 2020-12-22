@@ -36,7 +36,7 @@ vpath %.o $(BUILD_DIR)
 
 all: $(BUILD_DIR) $(TARGET)  $(BUILD_DIR)/libu8g.a
 
-SOURCES = arduino_io.cpp timer0.cpp uart.cpp debounce.cpp micro_panel.cpp midi_clock.cpp midi_state.cpp squeue.cpp main.cpp 
+SOURCES = arduino_io.cpp timer0.cpp uart.cpp debounce.cpp micro_panel.cpp midi.cpp squeue.cpp main.cpp 
 
 OBJS = $(addprefix $(BUILD_DIR)/, $(SOURCES:.cpp=.o))
 
