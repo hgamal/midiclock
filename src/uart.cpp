@@ -4,16 +4,11 @@
 #include "uart.h"
 
 /*
-#include "midi.h"
-#include "squeue.h"
-
 ISR(USART1_RX_vect)
 {
     char ReceivedByte;
     ReceivedByte = UDR1; // Fetch the received byte value into the variable " ByteReceived "
-    //UDR1 = ReceivedByte; // Echo back the received byte back to the computer
-	//midi_evaluate_state(ReceivedByte);
-	enqueue(ReceivedByte);
+    UDR1 = ReceivedByte; // Echo back the received byte back to the computer
 }
 */
 

@@ -11,7 +11,6 @@ void enqueue(uint8_t x)
     int8_t n = (inq + 1) % QUEUE_SIZE;
     if (n == outq) {
         // puts("queue overflow");
-		// odisplay_printf("queue overflow\n");
         return;
     }
 
