@@ -32,12 +32,12 @@ U8GLIB_SSD1306_128X64 u8g(OLED_CS, OLED_DC, OLED_RESET);
 
 const char *main_itens[] = { "BPM View", "Messages", "Config", "Save", NULL };
 const char *button_itens[] = { "Normaly Closed", "Normaly Opened", "Latched", "Return", NULL };
-const char *config_itens[] = { "MIDI Channel", "MIDI CC TAP Key", "Button 1", "Button 2", "Return", NULL };
+const char *config_itens[] = { "MIDI Channel", "MIDI CC TAP Key", "Switch 1", "Switch 2", "Return", NULL };
 
 MicroPanelMenu *mainMenu;
 MicroPanelMenu *configMenu;
-MicroPanelCheck *buttonMenu1;
-MicroPanelCheck *buttonMenu2;
+MicroPanelCheck *switchMenu1;
+MicroPanelCheck *switchMenu2;
 MicroPanelTerminal *terminal;
 MicroPanelBigNumber *bign;
 MicroPanelBigNumber *midiChannelPanel;
@@ -274,7 +274,7 @@ void menuClick()
 			writeConfig();
 			break;
 		}  
-	} else if (panel == buttonMenu1 || panel == buttonMenu2) {
+	} else if (panel == switchMenu1 || panel == switchMenu2) {
 		uint8_t x = ((MicroPanelCheck *) panel)->getCurrItem();
 		if (x == 3)
 			panel = configMenu;
@@ -290,10 +290,10 @@ void menuClick()
 			panel = midiTapCCPanel;
 			break;
 		case 2:
-			panel = buttonMenu1;
+			panel = switchMenu1;
 			break;
 		case 3:
-			panel = buttonMenu2;
+			panel = switchMenu2;
 			break;		
 		case 4:
 			panel = mainMenu;	
@@ -339,8 +339,8 @@ void setup()
 	
 	mainMenu = new MicroPanelMenu(main_itens);
 	terminal = new MicroPanelTerminal();
-	buttonMenu1 = new MicroPanelCheck(button_itens, &buttonType[0]);
-	buttonMenu2 = new MicroPanelCheck(button_itens, &buttonType[1]);
+	switchMenu1 = new MicroPanelCheck(button_itens, &buttonType[0]);
+	switchMenu2 = new MicroPanelCheck(button_itens, &buttonType[1]);
 	configMenu = new MicroPanelMenu(config_itens);
 	bign = new MicroPanelBigNumber("bpm", 0);
 	midiChannelPanel = new MicroPanelBigNumber("channel", 0);

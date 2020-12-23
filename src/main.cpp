@@ -60,12 +60,12 @@ uint16_t bpmConfig = 200;
 
 const char *main_itens[] = { "BPM View", "Messages", "Config", "Save", NULL };
 const char *button_itens[] = { "Normaly Closed", "Normaly Opened", "Latched", "Return", NULL };
-const char *config_itens[] = { "MIDI Channel", "MIDI CC TAP Key", "Button 1", "Button 2", "Return", NULL };
+const char *config_itens[] = { "MIDI Channel", "MIDI CC TAP Key", "Switch 1", "Switch 2", "Return", NULL };
 
 MicroPanelMenu mainMenu(main_itens);
 MicroPanelTerminal terminal;
-MicroPanelCheck buttonMenu1(button_itens, &buttonType[0]);
-MicroPanelCheck buttonMenu2(button_itens, &buttonType[1]);
+MicroPanelCheck switchMenu1(button_itens, &buttonType[0]);
+MicroPanelCheck switchMenu2(button_itens, &buttonType[1]);
 MicroPanelMenu configMenu(config_itens);
 MicroPanelBigNumber bign("bpm", 0);
 MicroPanelBigNumber midiChannelPanel("channel", 0);
@@ -279,7 +279,7 @@ void menuClick()
 			writeConfig();
 			break;
 		}  
-	} else if (panel == &buttonMenu1 || panel == &buttonMenu2) {
+	} else if (panel == &switchMenu1 || panel == &switchMenu2) {
 		uint8_t x = ((MicroPanelCheck *) panel)->getCurrItem();
 		if (x == 3)
 			panel = &configMenu;
@@ -295,10 +295,10 @@ void menuClick()
 			panel = &midiTapCCPanel;
 			break;
 		case 2:
-			panel = &buttonMenu1;
+			panel = &switchMenu1;
 			break;
 		case 3:
-			panel = &buttonMenu2;
+			panel = &switchMenu2;
 			break;		
 		case 4:
 			panel = &mainMenu;	
