@@ -21,10 +21,14 @@
 #define OLED_CS    A2
 #define OLED_RESET A0
 
+#define encoder0PinA 9
+#define encoder0PinB 8
+
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
-U8GLIB_SSD1306_128X64 u8g(OLED_CLK, OLED_MOSI, OLED_CS, OLED_DC, OLED_RESET);
+//U8GLIB_SSD1306_128X64 u8g(OLED_CLK, OLED_MOSI, OLED_CS, OLED_DC, OLED_RESET);
+U8GLIB_SSD1306_128X64 u8g(OLED_CS, OLED_DC, OLED_RESET);
 
 const char *main_itens[] = { "BPM View", "Messages", "Config", "Save", NULL };
 const char *button_itens[] = { "Normaly Closed", "Normaly Opened", "Latched", "Return", NULL };
@@ -41,22 +45,12 @@ MicroPanelBigNumber *midiTapCCPanel;
 
 MicroPanel *panel = mainMenu;
 
-#define encoder0PinA 9
-#define encoder0PinB 8
-
-int16_t encoderOldPosition = 0;
-int16_t encoderPosition = 0;
 uint16_t blinkTime = 0;
-uint32_t countInt = 0;
 uint8_t inTap = 0;
 
 uint8_t buttonPort[2] = { TAP1, TAP2 };
 uint8_t buttonState[2] = { 0, 0 };
 uint8_t currButton = 0;
-
-uint8_t encoder0PinALast = HIGH;
-uint8_t click=0;
-uint8_t tap=0;
 
 #define BT_NORMALY_CLOSED	0
 #define BT_NORMALY_OPEN		1
@@ -66,6 +60,7 @@ uint8_t tap=0;
 uint8_t channel = 1;
 uint8_t tapcc = 64;
 uint8_t buttonType[2] = { BT_NORMALY_CLOSED, BT_NORMALY_OPEN };
+uint16_t bpmConfig = 200;
 
 void readConfig()
 {
@@ -73,6 +68,7 @@ void readConfig()
 	tapcc	= EEPROM.read(2);
 	buttonType[0] = EEPROM.read(3);
 	buttonType[1] = EEPROM.read(4);
+	bpmConfig = EEPROM.read(5);
 }
 
 void writeConfig()
@@ -93,64 +89,60 @@ void writeConfig()
 	if (buttonType[1] > BT_LATCHED)
 		buttonType[1] = BT_NORMALY_OPEN;
 
-	Serial1.println("Saved");
+	EEPROM.update(5, bpmConfig);
 }
 
 
-void processMIDIClock(uint32_t now)
+void processMIDIClock()
 {
+	uint32_t now = micros();
 	static uint32_t old_time = 0;
 	uint32_t diff = now - old_time;
 
-	uint16_t new_bpm = 25000000UL / diff;
-	midi_clock_setBPM(new_bpm);
+	bpmConfig = 25000000UL / diff;
+	midi_clock_setBPM(bpmConfig);
+	MicroPanel::reload();
 
 	inTap = 0;
 	old_time = now;
 }
 
-void processTAP(uint32_t now, bool midi=false)
+void processTAP()
 {
 	static uint32_t old_time = 0;
+	uint32_t now = micros();
 	uint32_t diff = now - old_time;
-	uint8_t n = digitalRead(TAPSWT);
-	
+
+	if (!old_time) {
+		inTap = 1;
+		old_time = now;
+		return;
+	}	
+
 	if (diff > MAX_TIME) {
 		old_time = 0;
 		inTap = 0;
-	}
-	
-	if (midi || debounce(!n, &tap) == KEY_DOWN) {
-		if (!old_time) {
-			inTap = 1;
-			old_time = now;
-			return;
-		}	
-
-		uint16_t new_bpm = 60000000UL / diff;
-		midi_clock_setBPM(new_bpm);
-
-		inTap = 0;
-		old_time = now;
-		MicroPanel::reload();
+		return;
 	}
 
-	return 0;
+	bpmConfig = 60000000UL / diff;
+	midi_clock_setBPM(bpmConfig);
+	MicroPanel::reload();
+
+	inTap = 0;
+	old_time = now;
 }
 
 void sendMIDI(uint8_t message)
 {
 	if (Serial1.availableForWrite())
 		Serial1.write(message);
-	else {
-		Serial.println("ENQUEUE");
+	else
 		enqueue(message);
-	}
 }
 
 void eventClockProc(uint8_t message, uint32_t absolute_position, uint16_t bpm)
 {
-	
 	if (absolute_position % 24 == 0)
 		blinkTime = 100;
 
@@ -161,9 +153,8 @@ void eventMidiProc(uint8_t message, uint8_t control, uint8_t value)
 {	
 	if (((message & 0xf0) == 0xB0) && (control == tapcc) && (value == 127)) {
 		uint32_t now = micros();
-		processTAP(now, true);
+		processTAP();
     	terminal->printf("\nTAP %d\n", midi_clock_getBPM());
-		
 	}
 }
 
@@ -175,7 +166,7 @@ void serialEvent1()
     	
 		terminal->printf("%02x ", message & 0xff);
 		
-		midi_evaluate_state(message, eventMidiProc);
+		midi_evaluate_state(message);
 		
 		sendMIDI(message);
 		
@@ -203,11 +194,10 @@ void switchButton(uint8_t id, uint8_t state)
 	}
 }
 
-void clock_event()
+ISR(TIMER1_COMPA_vect)          // timer compare interrupt service routine
 {
 	uint32_t now = micros();
-
-	processTAP(now);
+	midi_clock_process(now);
 
 	if (inTap) {
 	    digitalWrite(TAPLED, HIGH);
@@ -224,42 +214,6 @@ void clock_event()
 		  }
 		}
 	}
-
-	midi_clock_process(now, eventClockProc);
-	
-}
-
-
-ISR(TIMER1_COMPA_vect)          // timer compare interrupt service routine
-{
-	clock_event();
-
-	countInt++;
-	
-	static uint8_t dbc=-1;
-	
-	dbc = (dbc + 1) % 20;
-	
-	if (dbc == 0)
-		return;
-
-	uint8_t n = digitalRead(CLICK);
-	//Serial.println(n);
-	if (debounce(!n, &click) == KEY_DOWN)
-		menuClick();
-
-	MicroPanel::reload();
-
-	n = digitalRead(encoder0PinA);
-	if ((encoder0PinALast == HIGH) && (n == LOW)) {
-		if (digitalRead(encoder0PinB) == HIGH)
-			encoderPosition--;
-		else
-			encoderPosition++;
-		//Serial.println(encoderPosition);
-		digitalWrite(RXLED, digitalRead(RXLED) ^ 1);
-	}
-	encoder0PinALast = n;
 }
 
 void initCounter(void)
@@ -296,101 +250,6 @@ void initCounter(void)
 	TIMSK1 |= (1 << OCIE1A);  // enable timer compare interrupt
 	
 	sei(); 
-}
-
-void setup()
-{
-	Serial.begin(9600);
-	Serial1.begin(31250);
-
-	pinMode(1, OUTPUT);
-	pinMode(RXLED, OUTPUT);
-	//pinMode(21, OUTPUT);
-	pinMode(TAPLED,OUTPUT);
-	pinMode(CLICK,INPUT);
-	pinMode(TAPSWT,INPUT);
-
-	pinMode(TAP1, OUTPUT);
-	pinMode(TAP2, OUTPUT);
-	
-	//pinMode(OLED_MOSI, OUTPUT);
-	//pinMode(OLED_CLK, OUTPUT);
-	pinMode(OLED_DC, OUTPUT);
-	pinMode(OLED_CS, OUTPUT);
-	pinMode(OLED_RESET, OUTPUT);
-
-	// u8g.setContrast(255);
-	u8g.setColorIndex(1);
-	u8g.setFont(u8g_font_6x13B);
-	
-	mainMenu = new MicroPanelMenu(main_itens);
-	terminal = new MicroPanelTerminal();
-	buttonMenu1 = new MicroPanelCheck(button_itens, &buttonType[0]);
-	buttonMenu2 = new MicroPanelCheck(button_itens, &buttonType[1]);
-	configMenu = new MicroPanelMenu(config_itens);
-	bign = new MicroPanelBigNumber("bpm", 0);
-	midiChannelPanel = new MicroPanelBigNumber("channel", 0);
-	midiTapCCPanel = new MicroPanelBigNumber("TAP CC", 0);
-	
-	panel = bign;
-	
-	initCounter();
-
-	readConfig();
-
-	midi_set_channel(channel);
-	midi_clock_init(micros());
-	
-	MicroPanel::reload();
-	terminal->puts("Messages\n");
-}
-
-void loop() 
-{
-	/** purge serial characters **/
-	if (!empty()) {
-		noInterrupts();
-		if (Serial1.availableForWrite()) {
-			Serial.println("DEQUEUE");
-			Serial1.write(dequeue());
-		}
-		interrupts();
-	}
-	
-	/** this code rules what occurs when the dial button is used **/
-	if (encoderPosition != encoderOldPosition) {
-		uint8_t inc = encoderPosition > encoderOldPosition ? -1 : 1;
-		if(!digitalRead(TAPSWT)) 
-			inc *= 10;
-
-		if (panel == bign) {
-			midi_clock_add(inc);
-			MicroPanel::reload();
-		} else if (panel == midiChannelPanel) {
-			channel = (channel - inc) & 15;
-			MicroPanel::reload();
-			midi_set_channel(channel);
-		} else if (panel == midiTapCCPanel) {
-			tapcc = (tapcc - inc) & 127;
-			MicroPanel::reload();
-		} else if (panel != terminal) {
-			((MicroPanelMenu *)panel)->updateMenu(encoderPosition > encoderOldPosition ? 1 : -1);
-			MicroPanel::reload();
-			inTap = 0;
-		}
-
-		encoderOldPosition = encoderPosition;
-	}
-	
-	/** this code rules what is drawed to screen **/
-	if (panel == bign)
-		bign->number = midi_clock_getBPM();
-	else if (panel == midiChannelPanel)
-		midiChannelPanel->number = channel;
-	else if (panel == midiTapCCPanel)
-		midiTapCCPanel->number = tapcc;
-
-	panel->draw();
 }
 
 /** this code rules what occurs when the dial button is clicked **/
@@ -447,4 +306,130 @@ void menuClick()
 	}
 	
 	MicroPanel::reload();
+}
+
+void setup()
+{
+	Serial.begin(9600);
+	Serial1.begin(31250);
+	midi_init(eventMidiProc, eventClockProc);
+
+	pinMode(1, OUTPUT);
+	pinMode(RXLED, OUTPUT);
+	pinMode(TAPLED,OUTPUT);
+	pinMode(TAP1, OUTPUT);
+	pinMode(TAP2, OUTPUT);
+	pinMode(OLED_MOSI, OUTPUT);
+	pinMode(OLED_CLK, OUTPUT);
+	pinMode(OLED_DC, OUTPUT);
+	pinMode(OLED_CS, OUTPUT);
+	pinMode(OLED_RESET, OUTPUT);
+
+	pinMode(0, INPUT);
+	pinMode(CLICK,INPUT);
+	pinMode(TAPSWT,INPUT);
+	pinMode(encoder0PinA, INPUT);
+	pinMode(encoder0PinB, INPUT);
+
+	MicroPanel::init(&u8g);
+	
+	u8g.setContrast(255);
+	u8g.setColorIndex(1);
+	u8g.setFont(u8g_font_6x13B);
+	
+	mainMenu = new MicroPanelMenu(main_itens);
+	terminal = new MicroPanelTerminal();
+	buttonMenu1 = new MicroPanelCheck(button_itens, &buttonType[0]);
+	buttonMenu2 = new MicroPanelCheck(button_itens, &buttonType[1]);
+	configMenu = new MicroPanelMenu(config_itens);
+	bign = new MicroPanelBigNumber("bpm", 0);
+	midiChannelPanel = new MicroPanelBigNumber("channel", 0);
+	midiTapCCPanel = new MicroPanelBigNumber("TAP CC", 0);
+	
+	panel = bign;
+	
+	initCounter();
+
+	readConfig();
+
+	midi_set_channel(channel);
+	midi_clock_init(micros(), bpmConfig);
+	
+	MicroPanel::reload();
+	terminal->puts("Messages\n");
+}
+
+void loop() 
+{
+	/** purge serial characters **/
+	if (!empty()) {
+		noInterrupts();
+		if (Serial1.availableForWrite())
+			Serial1.write(dequeue());
+		interrupts();
+	}
+	
+	static uint8_t click=0;
+	uint8_t n = digitalRead(CLICK);
+	if (debounce(!n, &click) == KEY_DOWN)
+		menuClick();
+
+	static uint8_t tap=0;
+	n = digitalRead(TAPSWT);
+	if (debounce(!n, &tap) == KEY_DOWN)
+		processTAP();
+
+	static uint32_t lastCheck = 0;
+	static uint8_t encoder0PinALast = HIGH;
+	static int16_t encoderOldPosition = 0;
+	static int16_t encoderPosition = 0;
+	uint32_t now = micros();
+	if (now - lastCheck > 200) {
+		lastCheck = now;
+		n = digitalRead(encoder0PinA);
+		if (encoder0PinALast && !n) {
+			if (digitalRead(encoder0PinB))
+				encoderPosition--;
+			else
+				encoderPosition++;
+
+			digitalWrite(RXLED, digitalRead(RXLED) ^ 1);
+		}
+		encoder0PinALast = n;
+
+		/** this code rules what occurs when the dial button is used **/
+		if (encoderPosition != encoderOldPosition) {
+			uint8_t inc = encoderPosition > encoderOldPosition ? -1 : 1;
+			if(!digitalRead(TAPSWT)) 
+				inc *= 10;
+
+			if (panel == bign) {
+				midi_clock_add(inc);
+				MicroPanel::reload();
+			} else if (panel == midiChannelPanel) {
+				channel = (channel - inc) & 15;
+				MicroPanel::reload();
+				midi_set_channel(channel);
+			} else if (panel == midiTapCCPanel) {
+				tapcc = (tapcc - inc) & 127;
+				MicroPanel::reload();
+			} else if (panel != terminal) {
+				((MicroPanelMenu *)panel)->updateMenu(encoderPosition > encoderOldPosition ? 1 : -1);
+				MicroPanel::reload();
+				inTap = 0;
+			}
+
+			encoderOldPosition = encoderPosition;
+		}
+	}
+	
+	/** this code rules what is drawed to screen **/
+	if (panel == bign)
+		bpmConfig = bign->number = midi_clock_getBPM();
+	else if (panel == midiChannelPanel)
+		midiChannelPanel->number = channel;
+	else if (panel == midiTapCCPanel)
+		midiTapCCPanel->number = tapcc;
+
+	panel->refresh();
 }
