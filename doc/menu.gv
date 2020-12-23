@@ -1,0 +1,28 @@
+digraph Display {
+
+	node [ shape = "rectangle" color="black" fontcolor="blue" fontsize="10" ];
+	edge [ arrowhead = "empty" fontsize="7" fontcolor="red" ]
+
+	"Main Menu" -> "Main Menu" [ label = "opt:save" ]
+
+	"Main Menu" -> "BPM View"
+	"BPM View" -> "Main Menu" [ label = "click" ]
+
+	"Main Menu" -> "Config"
+	"Config" -> "Main Menu" [ label = "opt:return" ]
+
+	"Main Menu" -> "MIDI Messages"
+	"MIDI Messages" -> "Main Menu" [ label = "opt:return" ]
+
+	"Config" -> "MIDI Channel";
+	"MIDI Channel" -> "Config" [ label = "click" ];
+
+	"Config" -> "CC Tap Key";
+	"CC Tap Key" -> "Config" [ label = "click" ];
+
+	"Config" -> "Config Switch 1";
+	"Config Switch 1" -> "Config" [ label = "opt:return" ];
+
+	"Config" -> "Config Switch 2";
+	"Config Switch 2" -> "Config" [ label = "opt:return" ];
+}
