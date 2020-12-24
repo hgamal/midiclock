@@ -1,3 +1,5 @@
 (sym_lib_table
   (lib (name arduino)(type Legacy)(uri ${KIPRJMOD}/arduino.lib)(options "")(descr ""))
+  (lib (name aqy21)(type Legacy)(uri ${KIPRJMOD}/aqy21.lib)(options "")(descr ""))
+  (lib (name jack)(type Legacy)(uri ${KIPRJMOD}/jack.lib)(options "")(descr ""))
 )

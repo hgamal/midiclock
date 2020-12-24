@@ -9,6 +9,17 @@ The BPM can be set by three sources:
 - using the dial button available on the front of the device;
 - tapping the desired beat on using the footswitch available on the front of the device; or
 - sending a configured MIDI control change message to the device on the configured channel.
+
+## Schematics
+
+The figure bellow shows the Midiclock schematics
+
+![](doc/midiclock_schematics.svg)
+
+### The display
+
+Midiclock uses a blue oled display with 128 x 64 dots using SSD1306.
+
 ## Menu structure
 
 ![](doc/menu.svg)
