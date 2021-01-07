@@ -10,6 +10,12 @@ Three sources can set the BPM:
 - tapping the desired beat on using the footswitch on the front of the device; or
 - sending a configured MIDI control change message to the device on the configured channel.
 
+## The source code
+
+There are two implementations available here. The first is to target the Arduino development environment, and it is available in the directory [midiclock](midiclock). The second is the same using pure C and C++ source code, and it is available in the directory [src](src).
+
+The pure C and C++ implementation use less memory than the Arduino version, but the Arduino version is the most updated.
+
 ## Schematics
 
 The figure below shows the Midiclock schematics:
@@ -124,7 +130,7 @@ You can test the tapping via midi sending two or more messages as followed:
 
 ### Checking BPM Acurracy
 
-In the repository exists a C++ program, called 'count.cpp'. Once compiled, it can be used to verify the accuracy of Beats per Minute produced by midiclock.
+In the repository exists a C++ program, called [count.cpp](count.cpp). Once compiled, it can be used to verify the accuracy of Beats per Minute produced by midiclock.
 
 The program counts the number of MIDI Clock messages taking into account the time elapsed between them and calculates the obtained Beats per Minute.
 
