@@ -59,7 +59,7 @@ uint8_t buttonType[2] = { BT_NORMALY_CLOSED, BT_NORMALY_OPEN };
 uint16_t bpmConfig = 200;
 
 const char *main_itens[] = { "BPM View", "Messages", "Config", "Save", NULL };
-const char *button_itens[] = { "Normaly Closed", "Normaly Opened", "Latched", "Return", NULL };
+const char *button_itens[] = { "Normally Closed", "Normally Opened", "Latched", "Return", NULL };
 const char *config_itens[] = { "MIDI Channel", "MIDI CC TAP Key", "Switch 1", "Switch 2", "Return", NULL };
 
 MicroPanelMenu mainMenu(main_itens);
@@ -87,15 +87,15 @@ void writeConfig()
 	eeprom_update_byte((uint8_t *) 1, channel);
 	if (channel > 15)
 		channel = 1;
-		
+
 	eeprom_update_byte((uint8_t *) 2, tapcc);
 	if (tapcc > 127)
 		tapcc = 64;
-		
+
 	eeprom_update_byte((uint8_t *) 3, buttonType[0]);
 	if (buttonType[0] > BT_LATCHED)
 		buttonType[0] = BT_NORMALY_CLOSED;
-		
+
 	eeprom_update_byte((uint8_t *) 4, buttonType[1]);
 	if (buttonType[1] > BT_LATCHED)
 		buttonType[1] = BT_NORMALY_OPEN;
@@ -127,7 +127,7 @@ void processTAP()
 		inTap = 1;
 		old_time = now;
 		return;
-	}	
+	}
 
 	if (diff > MAX_TIME) {
 		old_time = 0;
@@ -160,7 +160,7 @@ void eventClockProc(uint8_t message, uint32_t absolute_position, uint16_t bpm)
 }
 
 void eventMidiProc(uint8_t message, uint8_t control, uint8_t value)
-{	
+{
 	if (((message & 0xf0) == 0xB0) && (control == tapcc) && (value == 127)) {
 		processTAP();
     	terminal.printf("\nTAP %d\n", midi_clock_getBPM());
@@ -172,13 +172,13 @@ ISR(USART1_RX_vect)
 	while (uart_getchar_ready()) {
 	    // get the new byte:
     	char message = (char) uart_getchar();
-    	
+
 		terminal.printf("%02x ", message & 0xff);
-		
+
 		midi_evaluate_state(message);
-		
+
 		sendMIDI(message);
-		
+
 		MicroPanel::reload();
   	}
 }
@@ -190,11 +190,11 @@ void switchButton(uint8_t id, uint8_t state)
 			case BT_NORMALY_OPEN:
 				digitalWrite(buttonPort[id], state);
 				break;
-				
+
 			case BT_NORMALY_CLOSED:
 				digitalWrite(buttonPort[id], !state);
 				break;
-				
+
 			case BT_LATCHED:
 				digitalWrite(buttonPort[id], buttonState[id]);
 				break;
@@ -227,11 +227,11 @@ ISR(TIMER1_COMPA_vect)          // timer compare interrupt service routine
 
 void initCounter(void)
 {
-	// initialize timer1 
+	// initialize timer1
 	TCCR1A = 0;
 	TCCR1B = 0;
 	TCNT1  = 0;
-	// N = Precaler factor 1, 8, 64, 256, 1024) 
+	// N = Precaler factor 1, 8, 64, 256, 1024)
 	// CSN2 CSN1 CSN0 Description
 	//    0    0    0 No clock source (Timer/Counter stopped)
 	//    0    0    1 clkI/O/(No prescaling)
@@ -243,15 +243,15 @@ void initCounter(void)
 	//    1    1    1 External clock source on T0 pin. Clock on rising edge.
 	// F = Flck / (2 * N * (1 + OCRnX))
 	// OCRnX = Fclk / (F * 2 * N )  + 1
-	// F = 1ms => 
+	// F = 1ms =>
 #if F_CPU == 16000000
 	//OCR1A = 311;            // 100 Hz => 10 ms (100.16 Hz => 9.984 ms)
 	OCR1A = 30;               // 1000 Hz => 1 ms (1008.06 Hz => 0.992 ms)
-	TCCR1B |= (1 << CS12);    // 256 prescaler 
+	TCCR1B |= (1 << CS12);    // 256 prescaler
 #else
 	//OCR1A = 624;            // 100 Hz => 10 ms (100.00 Hz => 10 ms)
 	//OCR1A = 61;             // 1000 Hz => 1 ms (1008.06 Hz => 0.992 ms)
-	TCCR1B |= (1 << CS10) | (1 << CS11);    // 64 prescaler 
+	TCCR1B |= (1 << CS10) | (1 << CS11);    // 64 prescaler
 #endif
 	TCCR1B |= (1 << WGM12);   // CTC mode
 	TIMSK1 |= (1 << OCIE1A);  // enable timer compare interrupt
@@ -278,7 +278,7 @@ void menuClick()
 		case 3:
 			writeConfig();
 			break;
-		}  
+		}
 	} else if (panel == &switchMenu1 || panel == &switchMenu2) {
 		uint8_t x = ((MicroPanelCheck *) panel)->getCurrItem();
 		if (x == 3)
@@ -299,9 +299,9 @@ void menuClick()
 			break;
 		case 3:
 			panel = &switchMenu2;
-			break;		
+			break;
 		case 4:
-			panel = &mainMenu;	
+			panel = &mainMenu;
 			break;
 		}
 	} else if (panel == &midiChannelPanel || panel == &midiTapCCPanel) {
@@ -309,7 +309,7 @@ void menuClick()
 	} else  {
 		panel = &mainMenu;
 	}
-	
+
 	MicroPanel::reload();
 }
 
@@ -343,16 +343,16 @@ int main()
 	u8g.setContrast(255);
 	u8g.setColorIndex(1);
 	u8g.setFont(u8g_font_6x13B);
-		
+
 	panel = &bign;
-	
+
 	initCounter();
 
 	readConfig();
 
 	midi_set_channel(channel);
 	midi_clock_init(micros(), bpmConfig);
-	
+
 	MicroPanel::reload();
 	terminal.puts("Messages\n");
 
@@ -399,7 +399,7 @@ int main()
 			/** this code rules what occurs when the dial button is used **/
 			if (encoderPosition != encoderOldPosition) {
 				uint8_t inc = encoderPosition > encoderOldPosition ? -1 : 1;
-				if(!digitalRead(TAPSWT)) 
+				if(!digitalRead(TAPSWT))
 					inc *= 10;
 
 				if (panel == &bign) {
@@ -421,7 +421,7 @@ int main()
 				encoderOldPosition = encoderPosition;
 			}
 		}
-		
+
 		/** this code rules what is drawed to screen **/
 		if (panel == &bign)
 			bpmConfig = bign.number = midi_clock_getBPM();
